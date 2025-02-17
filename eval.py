@@ -29,6 +29,9 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
 
+VEHICLE_CLASSES = {'bicycle', 'car', 'motorcycle', 'bus', 'train', 'truck', 'boat'}
+
+
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
@@ -132,7 +135,7 @@ coco_cats = {} # Call prep_coco_cats to fill this
 coco_cats_inv = {}
 color_cache = defaultdict(lambda: {})
 
-def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str=''):
+def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str='', save_masks=False, mask_output_dir="masks/"):
     """
     Note: If undo_transform=False then im_h and im_w are allowed to be None.
     """
@@ -164,6 +167,27 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
         if scores[j] < args.score_threshold:
             num_dets_to_consider = j
             break
+    
+    # Ensure the mask directory exists
+    if save_masks and not os.path.exists(mask_output_dir):
+        os.makedirs(mask_output_dir)
+
+    if args.display_masks and cfg.eval_mask_branch and num_dets_to_consider > 0:
+        masks = masks[:num_dets_to_consider, :, :, None]
+
+        for j in range(num_dets_to_consider):
+            class_id = classes[j]
+            class_name = cfg.dataset.class_names[class_id]
+
+            if class_name in VEHICLE_CLASSES:
+                mask = masks[j].squeeze().cpu().numpy()
+                
+                # Convert mask to binary
+                mask_binary = (mask * 255).astype(np.uint8)
+
+                # Save mask as .jpg file
+                mask_filename = os.path.join(mask_output_dir, f"{class_name}_{j}.jpg")
+                cv2.imwrite(mask_filename, mask_binary)
 
     # Quick and dirty lambda for selecting the color for a particular index
     # Also keeps track of a per-gpu color cache for maximum speed
@@ -597,7 +621,7 @@ def evalimage(net:Yolact, path:str, save_path:str=None):
     batch = FastBaseTransform()(frame.unsqueeze(0))
     preds = net(batch)
 
-    img_numpy = prep_display(preds, frame, None, None, undo_transform=False)
+    img_numpy = prep_display(preds, frame, None, None, undo_transform=False, save_masks=True)
     
     if save_path is None:
         img_numpy = img_numpy[:, :, (2, 1, 0)]

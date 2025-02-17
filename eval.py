@@ -29,6 +29,22 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
 
+VEHICLE_CLASSES = {'bicycle', 'car', 'motorcycle', 'bus', 'train', 'truck', 'boat'}
+COCO_CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
+                'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
+                'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
+                'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
+                'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+                'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
+                'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+                'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
+                'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
+                'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+                'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
+                'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven',
+                'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
+                'scissors', 'teddy bear', 'hair drier', 'toothbrush')
+
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
@@ -153,6 +169,18 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
 
     with timer.env('Copy'):
         idx = t[1].argsort(0, descending=True)[:args.top_k]
+        classes, scores, boxes = [x[idx].cpu().numpy() for x in t[:3]]
+
+        # Select only vehicle masks
+        mask_indices = [i for i in range(len(classes)) if COCO_CLASSES[classes[i]] in VEHICLE_CLASSES]
+
+        if not mask_indices:
+            print("No vehicle objects detected.")
+            return img_numpy
+
+        # Extract only vehicle masks
+        if cfg.eval_mask_branch:
+            masks = t[3][idx][mask_indices]  # Filter masks by selected indices
         
         if cfg.eval_mask_branch:
             # Masks are drawn on the GPU, so don't copy
@@ -165,10 +193,12 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
             num_dets_to_consider = j
             break
 
-    if save_mask_path and num_dets_to_consider > 0:
-        combined_mask = torch.sum(masks[:num_dets_to_consider], dim=0).cpu().numpy()  # Sum up all object masks
-        mask_image = (combined_mask * 255).astype(np.uint8)  # Convert to 0-255 scale
+    # Save only the mask as a separate image for vehicles
+    if save_mask_path and len(mask_indices) > 0:
+        combined_mask = torch.sum(masks, dim=0).cpu().numpy()  # Sum up all vehicle masks
+        mask_image = (combined_mask * 255).astype(np.uint8)  # Convert to grayscale mask
         cv2.imwrite(save_mask_path, mask_image)  # Save mask image
+
     # Quick and dirty lambda for selecting the color for a particular index
     # Also keeps track of a per-gpu color cache for maximum speed
     def get_color(j, on_gpu=None):

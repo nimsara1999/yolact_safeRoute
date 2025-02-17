@@ -29,6 +29,10 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
 
+
+VEHICLE_CLASSES = {'bicycle', 'car', 'motorcycle', 'bus', 'train', 'truck', 'boat'}
+
+
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
@@ -166,9 +170,17 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
             break
 
     if save_mask_path and num_dets_to_consider > 0:
-        combined_mask = torch.sum(masks[:num_dets_to_consider], dim=0).cpu().numpy()  # Sum up all object masks
-        mask_image = (combined_mask * 255).astype(np.uint8)  # Convert to 0-255 scale
-        cv2.imwrite(save_mask_path, mask_image)  # Save mask image
+        vehicle_masks = []
+        for j in range(num_dets_to_consider):
+            _class = cfg.dataset.class_names[classes[j]]  # Get class name
+            if _class in VEHICLE_CLASSES:  # Check if class is in VEHICLE_CLASSES
+                vehicle_masks.append(masks[j])  # Collect only vehicle masks
+
+        if len(vehicle_masks) > 0:  # Ensure there are vehicle masks to save
+            combined_mask = torch.sum(torch.stack(vehicle_masks), dim=0).cpu().numpy()
+            mask_image = (combined_mask * 255).astype(np.uint8)
+            cv2.imwrite(save_mask_path, mask_image)  # Save only vehicle masks
+
     # Quick and dirty lambda for selecting the color for a particular index
     # Also keeps track of a per-gpu color cache for maximum speed
     def get_color(j, on_gpu=None):

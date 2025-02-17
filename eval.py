@@ -132,7 +132,7 @@ coco_cats = {} # Call prep_coco_cats to fill this
 coco_cats_inv = {}
 color_cache = defaultdict(lambda: {})
 
-def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str=''):
+def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str='', save_mask_path=None):
     """
     Note: If undo_transform=False then im_h and im_w are allowed to be None.
     """
@@ -165,6 +165,10 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
             num_dets_to_consider = j
             break
 
+    if save_mask_path and num_dets_to_consider > 0:
+        combined_mask = torch.sum(masks[:num_dets_to_consider], dim=0).cpu().numpy()  # Sum up all object masks
+        mask_image = (combined_mask * 255).astype(np.uint8)  # Convert to 0-255 scale
+        cv2.imwrite(save_mask_path, mask_image)  # Save mask image
     # Quick and dirty lambda for selecting the color for a particular index
     # Also keeps track of a per-gpu color cache for maximum speed
     def get_color(j, on_gpu=None):
@@ -597,7 +601,8 @@ def evalimage(net:Yolact, path:str, save_path:str=None):
     batch = FastBaseTransform()(frame.unsqueeze(0))
     preds = net(batch)
 
-    img_numpy = prep_display(preds, frame, None, None, undo_transform=False)
+    mask_save_path = save_path.replace(".jpg", "_mask.jpg") if save_path else None
+    img_numpy = prep_display(preds, frame, None, None, undo_transform=False, mask_save_path=mask_save_path)
     
     if save_path is None:
         img_numpy = img_numpy[:, :, (2, 1, 0)]

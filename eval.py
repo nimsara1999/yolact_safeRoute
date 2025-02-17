@@ -602,7 +602,7 @@ def evalimage(net:Yolact, path:str, save_path:str=None):
     preds = net(batch)
 
     mask_save_path = save_path.replace(".jpg", "_mask.jpg") if save_path else None
-    img_numpy = prep_display(preds, frame, None, None, undo_transform=False, mask_save_path=mask_save_path)
+    img_numpy = prep_display(preds, frame, None, None, undo_transform=False, save_mask_path=mask_save_path)
     
     if save_path is None:
         img_numpy = img_numpy[:, :, (2, 1, 0)]

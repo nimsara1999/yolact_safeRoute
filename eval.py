@@ -132,7 +132,7 @@ coco_cats = {} # Call prep_coco_cats to fill this
 coco_cats_inv = {}
 color_cache = defaultdict(lambda: {})
 
-def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str='', save_mask_path=None):
+def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str=''):
     """
     Note: If undo_transform=False then im_h and im_w are allowed to be None.
     """
@@ -164,27 +164,7 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
         if scores[j] < args.score_threshold:
             num_dets_to_consider = j
             break
-    # Define vehicle classes
-    VEHICLE_CLASSES = {'bicycle', 'car', 'motorcycle', 'bus', 'train', 'truck', 'boat'}
 
-    # Filter detections for only vehicle classes
-    valid_indices = [i for i, c in enumerate(classes) if cfg.dataset.class_names[c] in VEHICLE_CLASSES]
-
-    if not valid_indices:
-        print("No vehicle objects detected.")
-        return img_numpy  # Return original image if no vehicles are detected
-
-    masks = masks[valid_indices]  # Keep only vehicle masks
-    classes = [classes[i] for i in valid_indices]  # Keep only vehicle class names
-    scores = [scores[i] for i in valid_indices]  # Keep only vehicle scores
-
-
-    # Save only the mask for vehicle objects
-    if save_mask_path and len(valid_indices) > 0:
-        combined_mask = torch.sum(masks, dim=0).cpu().numpy()  # Sum up all vehicle masks
-        mask_image = (combined_mask * 255).astype(np.uint8)  # Convert to 0-255 scale
-        cv2.imwrite(save_mask_path, mask_image)  # Save mask image
-        
     # Quick and dirty lambda for selecting the color for a particular index
     # Also keeps track of a per-gpu color cache for maximum speed
     def get_color(j, on_gpu=None):
@@ -617,8 +597,7 @@ def evalimage(net:Yolact, path:str, save_path:str=None):
     batch = FastBaseTransform()(frame.unsqueeze(0))
     preds = net(batch)
 
-    mask_save_path = save_path.replace(".jpg", "_mask.jpg") if save_path else None
-    img_numpy = prep_display(preds, frame, None, None, undo_transform=False, save_mask_path=mask_save_path)
+    img_numpy = prep_display(preds, frame, None, None, undo_transform=False)
     
     if save_path is None:
         img_numpy = img_numpy[:, :, (2, 1, 0)]
@@ -1124,5 +1103,4 @@ if __name__ == '__main__':
             net = net.cuda()
 
         evaluate(net, dataset)
-
 

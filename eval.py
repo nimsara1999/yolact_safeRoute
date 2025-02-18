@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 import cv2
 
 
-VEHICLE_CLASSES = {'bicycle', 'car', 'motorcycle', 'bus', 'train', 'truck', 'boat'}
+VEHICLE_CLASSES = {'bicycle', 'car', 'motorcycle', 'bus', 'train', 'truck', 'boat','person'}
 
 
 def str2bool(v):

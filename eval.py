@@ -613,7 +613,13 @@ def evalimage(net:Yolact, path:str, save_path:str=None):
     batch = FastBaseTransform()(frame.unsqueeze(0))
     preds = net(batch)
 
-    mask_save_path = save_path.replace(".jpg", "_mask.jpg") if save_path else None
+    mask_folder = "masks"
+    os.makedirs(mask_folder, exist_ok=True) 
+
+    filename = os.path.basename(path).replace(".jpg", "_mask.jpg")
+    mask_save_path = os.path.join(mask_folder, filename)
+
+    #mask_save_path = save_path.replace(".jpg", "_mask.jpg") if save_path else None
     img_numpy = prep_display(preds, frame, None, None, undo_transform=False, save_mask_path=mask_save_path)
     
     if save_path is None:

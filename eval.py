@@ -172,33 +172,26 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
     if save_mask_path and num_dets_to_consider > 0:
         vehicle_masks = []
         img_height, img_width = masks[0].shape[-2:]  # Get mask dimensions
-        gap_threshold = 20  # Maximum allowed gap (in pixels) before ignoring the mask
+        bottom_strip_height = 10  # Define bottom strip height
 
         for j in range(num_dets_to_consider):
             _class = cfg.dataset.class_names[classes[j]]
             if _class in VEHICLE_CLASSES:  # Check if class is in VEHICLE_CLASSES
                 mask = masks[j].cpu().numpy()
 
-                # Get the lower bound of the mask (last row)
-                lower_edge = mask[-1, :]
+                # Extract the bottom 10-pixel strip
+                lower_edge = mask[-bottom_strip_height:, :]  # Get last 10 rows
                 covered_pixels = np.sum(lower_edge > 0)  # Count non-zero (masked) pixels
-                coverage_ratio = covered_pixels / img_width  # Compute coverage ratio
+                coverage_ratio = covered_pixels / (bottom_strip_height * img_width)  # Compute coverage ratio
 
-                # Find the lowest row in the mask
-                rows_with_mask = np.any(mask, axis=1)  # Boolean array for rows containing any mask pixels
-                lowest_mask_row = np.max(np.where(rows_with_mask)[0]) if np.any(rows_with_mask) else -1
-
-                # Calculate the gap between the lowest mask row and the bottom of the image
-                gap = img_height - (lowest_mask_row + 1)
-
-                # Ignore if coverage is 75% or more, or the gap is within the threshold
-                if coverage_ratio < 0.75 and gap > gap_threshold:
+                if coverage_ratio < 0.75:  # Ignore if 75% or more of bottom strip is covered
                     vehicle_masks.append(masks[j])
 
         if len(vehicle_masks) > 0:  # Ensure there are vehicle masks to save
             combined_mask = torch.sum(torch.stack(vehicle_masks), dim=0).cpu().numpy()
             mask_image = (combined_mask * 255).astype(np.uint8)
             cv2.imwrite(save_mask_path, mask_image)  # Save only vehicle masks
+
 
 
 

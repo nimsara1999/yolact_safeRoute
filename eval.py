@@ -172,7 +172,7 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
     if save_mask_path and num_dets_to_consider > 0:
         vehicle_masks = []
         img_height, img_width = masks[0].shape[-2:]  # Get mask dimensions
-        bottom_strip_height = 10  # Define bottom strip height
+        bottom_strip_height = 30  # Define bottom strip height
 
         for j in range(num_dets_to_consider):
             _class = cfg.dataset.class_names[classes[j]]

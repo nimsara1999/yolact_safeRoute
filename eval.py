@@ -184,7 +184,7 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
                 covered_pixels = np.sum(lower_edge > 0)  # Count non-zero (masked) pixels
                 coverage_ratio = covered_pixels / (bottom_strip_height * img_width)  # Compute coverage ratio
 
-                if coverage_ratio < 0.75:  # Ignore if 75% or more of bottom strip is covered
+                if coverage_ratio < 0.5:  # Ignore if 75% or more of bottom strip is covered
                     vehicle_masks.append(masks[j])
 
         if len(vehicle_masks) > 0:  # Ensure there are vehicle masks to save

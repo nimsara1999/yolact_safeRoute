@@ -172,6 +172,7 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
     if save_mask_path and num_dets_to_consider > 0:
         vehicle_masks = []
         img_height, img_width = masks[0].shape[-2:]  # Get mask dimensions
+        gap_threshold = 5  # Maximum allowed gap (in pixels) before ignoring the mask
 
         for j in range(num_dets_to_consider):
             _class = cfg.dataset.class_names[classes[j]]
@@ -183,13 +184,22 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
                 covered_pixels = np.sum(lower_edge > 0)  # Count non-zero (masked) pixels
                 coverage_ratio = covered_pixels / img_width  # Compute coverage ratio
 
-                if coverage_ratio < 0.75:  # Ignore if it covers 75% or more of the lower edge
+                # Find the lowest row in the mask
+                rows_with_mask = np.any(mask, axis=1)  # Boolean array for rows containing any mask pixels
+                lowest_mask_row = np.max(np.where(rows_with_mask)[0]) if np.any(rows_with_mask) else -1
+
+                # Calculate the gap between the lowest mask row and the bottom of the image
+                gap = img_height - (lowest_mask_row + 1)
+
+                # Ignore if coverage is 75% or more, or the gap is within the threshold
+                if coverage_ratio < 0.75 and gap > gap_threshold:
                     vehicle_masks.append(masks[j])
 
         if len(vehicle_masks) > 0:  # Ensure there are vehicle masks to save
             combined_mask = torch.sum(torch.stack(vehicle_masks), dim=0).cpu().numpy()
             mask_image = (combined_mask * 255).astype(np.uint8)
             cv2.imwrite(save_mask_path, mask_image)  # Save only vehicle masks
+
 
 
     # Quick and dirty lambda for selecting the color for a particular index

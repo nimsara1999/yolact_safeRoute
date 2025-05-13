@@ -136,6 +136,63 @@ coco_cats = {} # Call prep_coco_cats to fill this
 coco_cats_inv = {}
 color_cache = defaultdict(lambda: {})
 
+# def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str='', save_mask_path=None):
+#     """
+#     Note: If undo_transform=False then im_h and im_w are allowed to be None.
+#     """
+#     if undo_transform:
+#         img_numpy = undo_image_transformation(img, w, h)
+#         img_gpu = torch.Tensor(img_numpy).cuda()
+#     else:
+#         img_gpu = img / 255.0
+#         h, w, _ = img.shape
+    
+#     with timer.env('Postprocess'):
+#         save = cfg.rescore_bbox
+#         cfg.rescore_bbox = True
+#         t = postprocess(dets_out, w, h, visualize_lincomb = args.display_lincomb,
+#                                         crop_masks        = args.crop,
+#                                         score_threshold   = args.score_threshold)
+#         cfg.rescore_bbox = save
+
+#     with timer.env('Copy'):
+#         idx = t[1].argsort(0, descending=True)[:args.top_k]
+        
+#         if cfg.eval_mask_branch:
+#             # Masks are drawn on the GPU, so don't copy
+#             masks = t[3][idx]
+#         classes, scores, boxes = [x[idx].cpu().numpy() for x in t[:3]]
+
+#     num_dets_to_consider = min(args.top_k, classes.shape[0])
+#     for j in range(num_dets_to_consider):
+#         if scores[j] < args.score_threshold:
+#             num_dets_to_consider = j
+#             break
+
+#     if save_mask_path and num_dets_to_consider > 0:
+#         vehicle_masks = []
+#         img_height, img_width = masks[0].shape[-2:]  # Get mask dimensions
+#         bottom_strip_height = 30  # Define bottom strip height
+
+#         for j in range(num_dets_to_consider):
+#             _class = cfg.dataset.class_names[classes[j]]
+#             if _class in VEHICLE_CLASSES:  # Check if class is in VEHICLE_CLASSES
+#                 mask = masks[j].cpu().numpy()
+
+#                 # Extract the bottom 10-pixel strip
+#                 lower_edge = mask[-bottom_strip_height:, :]  # Get last 10 rows
+#                 covered_pixels = np.sum(lower_edge > 0)  # Count non-zero (masked) pixels
+#                 coverage_ratio = covered_pixels / (bottom_strip_height * img_width)  # Compute coverage ratio
+
+#                 if coverage_ratio < 0.5:  # Ignore if 75% or more of bottom strip is covered
+#                     vehicle_masks.append(masks[j])
+
+#         if len(vehicle_masks) > 0:  # Ensure there are vehicle masks to save
+#             combined_mask = torch.sum(torch.stack(vehicle_masks), dim=0).cpu().numpy()
+#             mask_image = (combined_mask * 255).astype(np.uint8)
+#             cv2.imwrite(save_mask_path, mask_image)  # Save only vehicle masks
+
+
 def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, fps_str='', save_mask_path=None):
     """
     Note: If undo_transform=False then im_h and im_w are allowed to be None.
@@ -169,28 +226,34 @@ def prep_display(dets_out, img, h, w, undo_transform=True, class_color=False, ma
             num_dets_to_consider = j
             break
 
-    if save_mask_path and num_dets_to_consider > 0:
-        vehicle_masks = []
-        img_height, img_width = masks[0].shape[-2:]  # Get mask dimensions
-        bottom_strip_height = 30  # Define bottom strip height
+    if save_mask_path:
+        # Create a black image by default
+        mask_image = np.zeros((h, w), dtype=np.uint8)
+        
+        if num_dets_to_consider > 0:
+            vehicle_masks = []
+            img_height, img_width = masks[0].shape[-2:]  # Get mask dimensions
+            bottom_strip_height = 30  # Define bottom strip height
 
-        for j in range(num_dets_to_consider):
-            _class = cfg.dataset.class_names[classes[j]]
-            if _class in VEHICLE_CLASSES:  # Check if class is in VEHICLE_CLASSES
-                mask = masks[j].cpu().numpy()
+            for j in range(num_dets_to_consider):
+                _class = cfg.dataset.class_names[classes[j]]
+                if _class in VEHICLE_CLASSES:  # Check if class is in VEHICLE_CLASSES
+                    mask = masks[j].cpu().numpy()
 
-                # Extract the bottom 10-pixel strip
-                lower_edge = mask[-bottom_strip_height:, :]  # Get last 10 rows
-                covered_pixels = np.sum(lower_edge > 0)  # Count non-zero (masked) pixels
-                coverage_ratio = covered_pixels / (bottom_strip_height * img_width)  # Compute coverage ratio
+                    # Extract the bottom 10-pixel strip
+                    lower_edge = mask[-bottom_strip_height:, :]  # Get last 10 rows
+                    covered_pixels = np.sum(lower_edge > 0)  # Count non-zero (masked) pixels
+                    coverage_ratio = covered_pixels / (bottom_strip_height * img_width)  # Compute coverage ratio
 
-                if coverage_ratio < 0.5:  # Ignore if 75% or more of bottom strip is covered
-                    vehicle_masks.append(masks[j])
+                    if coverage_ratio < 0.5:  # Ignore if 75% or more of bottom strip is covered
+                        vehicle_masks.append(masks[j])
 
-        if len(vehicle_masks) > 0:  # Ensure there are vehicle masks to save
-            combined_mask = torch.sum(torch.stack(vehicle_masks), dim=0).cpu().numpy()
-            mask_image = (combined_mask * 255).astype(np.uint8)
-            cv2.imwrite(save_mask_path, mask_image)  # Save only vehicle masks
+            if len(vehicle_masks) > 0:  # If we found valid vehicle masks
+                combined_mask = torch.sum(torch.stack(vehicle_masks), dim=0).cpu().numpy()
+                mask_image = (combined_mask * 255).astype(np.uint8)
+        
+        # Save the mask (will be black if no valid masks were found)
+        cv2.imwrite(save_mask_path, mask_image)
 
 
 
